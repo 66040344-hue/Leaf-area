@@ -4,232 +4,800 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบตรวจวัดขนาดพื้นที่ใบไม้ (Leaf Area Measurement - Phase 1)</title>
-    <!-- Tailwind CSS สำหรับตกแต่ง UI ให้สวยงามทันสมัย -->
+    <title>ระบบวิเคราะห์พื้นที่ใบไม้ — Leaf Area Analyzer</title>
+    <meta name="description" content="ระบบวิเคราะห์พื้นที่ใบไม้อัตโนมัติด้วยการประมวลผลภาพ สำหรับงานวิจัยและการเกษตร">
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- SheetJS (xlsx) สำหรับ Export ไฟล์ Excel -->
+    <!-- SheetJS สำหรับ Export Excel -->
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <!-- Cropper.js สำหรับฟีเจอร์ตัดขอบภาพ -->
+    <!-- Cropper.js -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap"
+    <!-- Prompt Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
+
     <style>
+        * {
+            font-family: 'Prompt', sans-serif;
+        }
+
+        /* ── Custom Scrollbar ── */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(100, 130, 90, 0.35);
+            border-radius: 99px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 130, 90, 0.55);
+        }
+
+        /* ── Background ── */
         body {
-            font-family: 'Sarabun', sans-serif;
+            background-color: #f2f5ee;
+            background-image:
+                radial-gradient(ellipse at 10% 15%, rgba(160, 185, 140, 0.28) 0%, transparent 55%),
+                radial-gradient(ellipse at 88% 85%, rgba(140, 165, 120, 0.22) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(242, 245, 238, 1) 0%, transparent 70%);
+            min-height: 100vh;
+            color: #2a3a28;
+        }
+
+        /* ── Glass Card ── */
+        .glass {
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 255, 255, 0.82);
+            box-shadow: 0 2px 20px rgba(60, 90, 50, 0.07), 0 1px 3px rgba(60, 90, 50, 0.05);
+        }
+
+        .glass-dark {
+            background: rgba(38, 58, 32, 0.93);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* ── Step Badge ── */
+        .step-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: rgba(80, 110, 65, 0.12);
+            color: #4a6e3a;
+            font-size: 12px;
+            font-weight: 700;
+            border: 1.5px solid rgba(80, 110, 65, 0.25);
+            flex-shrink: 0;
+        }
+
+        /* ── Input ── */
+        .field-input {
+            width: 100%;
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.80);
+            border: 1.5px solid rgba(200, 215, 190, 0.9);
+            border-radius: 12px;
+            box-shadow: inset 0 1px 3px rgba(60, 90, 50, 0.06);
+            color: #2a3a28;
+            font-size: 14px;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .field-input:focus {
+            background: rgba(255, 255, 255, 1);
+            border-color: rgba(80, 120, 65, 0.5);
+            box-shadow: 0 0 0 3px rgba(80, 120, 65, 0.10), inset 0 1px 3px rgba(60, 90, 50, 0.06);
+        }
+
+        .field-input::placeholder {
+            color: #9aaf8a;
+        }
+
+        .field-input.error {
+            border-color: rgba(185, 50, 50, 0.45) !important;
+            box-shadow: 0 0 0 3px rgba(185, 50, 50, 0.09) !important;
+        }
+
+        /* ── Upload Zone ── */
+        .upload-zone {
+            border: 2px dashed rgba(100, 140, 80, 0.30);
+            border-radius: 20px;
+            padding: 52px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s;
+            background: rgba(225, 238, 215, 0.25);
+        }
+
+        .upload-zone:hover,
+        .upload-zone.drag-over {
+            border-color: rgba(80, 120, 65, 0.55);
+            background: rgba(210, 232, 195, 0.40);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(60, 100, 45, 0.08);
+        }
+
+        /* ── Btn Primary ── */
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 18px;
+            background: #3d6437;
+            color: #edf5e8;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(40, 80, 30, 0.22);
+        }
+
+        .btn-primary:hover {
+            background: #315430;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(40, 80, 30, 0.30);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        /* ── Btn Secondary ── */
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 18px;
+            background: rgba(255, 255, 255, 0.75);
+            color: #3d5a35;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1.5px solid rgba(200, 220, 185, 0.85);
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 1px 4px rgba(60, 90, 50, 0.08);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 1);
+            border-color: rgba(120, 160, 95, 0.5);
+            box-shadow: 0 2px 8px rgba(60, 90, 50, 0.12);
+        }
+
+        /* ── Btn Ghost ── */
+        .btn-ghost {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 12px;
+            background: transparent;
+            color: #6b8a5e;
+            border-radius: 9px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1.5px solid rgba(100, 140, 80, 0.22);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-ghost:hover {
+            background: rgba(100, 140, 80, 0.09);
+            border-color: rgba(100, 140, 80, 0.40);
+            color: #4a6e3a;
+        }
+
+        /* ── Range Slider ── */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 5px;
+            border-radius: 99px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type=range].hue-slider {
+            background: linear-gradient(to right, #c8e6c0, #388e3c);
+        }
+
+        input[type=range].shadow-slider {
+            background: linear-gradient(to right, #d5d9cf, #607060);
+        }
+
+        input[type=range].red-slider {
+            background: linear-gradient(to right, #f5c8c8, #b83030);
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid rgba(80, 120, 65, 0.45);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            border-color: #3d6437;
+            box-shadow: 0 2px 8px rgba(40, 80, 30, 0.2);
+        }
+
+        /* ── Table ── */
+        #outputTable thead th {
+            font-size: 11px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #7a9a6a;
+            font-weight: 600;
+        }
+
+        #outputTable tbody tr {
+            border-bottom: 1px solid rgba(160, 190, 140, 0.18);
+        }
+
+        #outputTable tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        #outputTable tbody tr:hover {
+            background: rgba(160, 200, 130, 0.07);
+        }
+
+        /* ── Loading Overlay ── */
+        #loadingOverlay {
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        /* ── Spinner ── */
+        .spinner {
+            width: 38px;
+            height: 38px;
+            border: 3px solid rgba(255, 255, 255, 0.25);
+            border-top-color: #a8d498;
+            border-radius: 50%;
+            animation: spin 0.85s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ── Modal Backdrop ── */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            background: rgba(20, 35, 18, 0.70);
+            backdrop-filter: blur(7px);
+            -webkit-backdrop-filter: blur(7px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        /* ── Fade-in animation ── */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeInUp 0.3s ease-out forwards;
+        }
+
+        /* ── Tooltip ── */
+        .has-tooltip {
+            position: relative;
+        }
+
+        .has-tooltip .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            width: 210px;
+            background: rgba(30, 50, 25, 0.96);
+            color: #d4ebc8;
+            border: 1px solid rgba(120, 160, 90, 0.2);
+            font-size: 11px;
+            line-height: 1.55;
+            border-radius: 10px;
+            padding: 8px 11px;
+            position: absolute;
+            z-index: 10;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.20);
+            transition: opacity 0.15s;
+            pointer-events: none;
+        }
+
+        .has-tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* ── Chip ── */
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 9px;
+            border-radius: 99px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(80, 120, 60, 0.10);
+            color: #4a6e3a;
+            border: 1px solid rgba(80, 120, 60, 0.22);
+        }
+
+        /* ── Natural Divider ── */
+        .natural-divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(100, 140, 80, 0.25), transparent);
         }
     </style>
 </head>
 
-<body class="bg-gradient-to-br from-stone-200 via-stone-100 to-stone-300 min-h-screen text-stone-800">
+<body>
 
-    <!-- Header -->
-    <header class="bg-stone-800/90 backdrop-blur-md text-stone-100 shadow-xl py-4 px-6 mb-8 border-b border-white/20">
-        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center">
-            <h1 class="text-2xl font-bold flex items-center gap-3">
-                <svg class="w-7 h-7 text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path>
-                </svg>
-                ระบบวิเคราะห์พื้นที่ใบไม้
-            </h1>
-            <span
-                class="text-sm bg-stone-700/80 backdrop-blur-sm px-3 py-1 rounded-full mt-2 md:mt-0 flex items-center gap-1.5 border border-white/20 shadow-inner text-stone-200">
-                <svg class="w-4 h-4 text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                ใช้สำหรับเพื่อการศึกษา
-            </span>
+    <!-- ══ HEADER ══ -->
+    <header class="glass-dark text-stone-100 py-3 px-6 mb-6 sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-8 h-8 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-green-200" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z" />
+                        <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold leading-tight text-white">ระบบวิเคราะห์พื้นที่ใบไม้</h1>
+                    <p class="text-[11px] text-green-300/70 leading-none">Leaf Area Analyzer</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span
+                    class="hidden sm:flex items-center gap-1.5 text-[11px] text-green-300/60 bg-white/6 px-3 py-1.5 rounded-full border border-white/12">
+                    <span class="w-1.5 h-1.5 bg-green-300 rounded-full"></span>
+                    ใช้งานฟรี
+                </span>
+                <button id="resetBtn" onclick="confirmReset()"
+                    class="hidden btn-ghost !text-white/40 !border-white/15 hover:!text-red-300 hover:!border-red-300/30 hover:!bg-red-300/10"
+                    title="เริ่มต้นใหม่">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    เริ่มใหม่
+                </button>
+            </div>
         </div>
     </header>
 
-    <main class="max-w-6xl mx-auto px-4 pb-12">
+    <main class="max-w-6xl mx-auto px-4 pb-16">
 
-        <!-- Configuration Panel -->
-        <div
-            class="bg-white/60 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 p-6 mb-8 relative overflow-hidden">
-            <div
-                class="absolute top-0 right-0 w-64 h-64 bg-stone-300/30 rounded-full blur-3xl -z-10 translate-x-1/2 -translate-y-1/2">
+        <!-- ══ STEP 1 · CONFIG ══ -->
+        <section class="glass rounded-2xl p-5 mb-4 animate-fade-in">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="step-badge">1</span>
+                <h2 class="text-sm font-semibold text-stone-500 uppercase tracking-widest">ตั้งค่าการวิเคราะห์</h2>
             </div>
-            <h2 class="text-lg font-semibold text-stone-800 mb-4">ตั้งค่าการวิเคราะห์</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-stone-700 mb-1">ชื่อพืช (Plant Name)</label>
-                    <input type="text" id="plantName" placeholder="ตัวอย่าง: ทุเรียน" oninput="updateMetadata()"
-                        class="w-full px-4 py-2.5 bg-white/70 backdrop-blur-sm border border-white/80 rounded-xl shadow-inner focus:ring-2 focus:ring-stone-600 focus:bg-white focus:outline-none transition-all">
+                    <label
+                        class="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">ชื่อพืช</label>
+                    <input type="text" id="plantName" class="field-input" placeholder="เช่น ทุเรียน, ข้าว"
+                        oninput="updateMetadata()">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-stone-700 mb-1">ทรีทเมนต์ (Treatment) </label>
-                    <input type="text" id="treatmentName" placeholder="ตัวอย่าง: T1" oninput="updateMetadata()"
-                        class="w-full px-4 py-2.5 bg-white/70 backdrop-blur-sm border border-white/80 rounded-xl shadow-inner focus:ring-2 focus:ring-stone-600 focus:bg-white focus:outline-none transition-all">
-                    <span class="text-xs text-stone-500">ลำดับจะถูกเรียงตามภาพที่อัปโหลด</span>
+                    <label
+                        class="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">รหัสทรีทเมนต์</label>
+                    <input type="text" id="treatmentName" class="field-input" placeholder="เช่น T1, A, Control"
+                        oninput="updateMetadata()">
+                    <p class="text-[11px] text-stone-400 mt-1">ระบบจะเรียงลำดับให้อัตโนมัติ</p>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-stone-700 mb-1">พื้นที่จุดอ้างอิงสีแดง
-                        (ตร.ซม.) ค่าเริ่มต้น: 4 ตร.ซม.</label>
-                    <input type="number" id="refArea" value="4"
-                        class="w-full px-4 py-2.5 bg-white/70 backdrop-blur-sm border border-white/80 rounded-xl shadow-inner focus:ring-2 focus:ring-stone-600 focus:bg-white focus:outline-none transition-all"
-                        title="ขนาดของสี่เหลี่ยมสีแดง (เช่น กว้าง 2 x ยาว 2 = 4 ตร.ซม.)">
-                    <span class="text-xs text-stone-500">*ไม่จำเป็นต้องเปลี่ยน
-                        หากไม่ได้มีการเปลี่ยนขนาดจุดอ้างอิง</span>
+                    <label
+                        class="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1.5">พื้นที่จุดอ้างอิงสีแดง
+                        (ตร.ซม.)</label>
+                    <input type="number" id="refArea" value="4" min="0.1" step="0.1" class="field-input"
+                        oninput="validateRefArea(this)">
+                    <p id="refAreaError" class="text-[11px] text-red-500 mt-1 hidden">กรุณากรอกค่าที่มากกว่า 0</p>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- Upload Section -->
-        <div class="bg-white/60 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 p-8 mb-8 text-center hover:bg-white/70 transition-all duration-300 cursor-pointer group"
-            onclick="document.getElementById('imageInput').click()">
-            <div
-                class="border-2 border-dashed border-stone-400/50 rounded-2xl p-10 bg-stone-100/30 group-hover:bg-stone-200/50 transition-all">
+        <!-- ══ STEP 2 · UPLOAD ══ -->
+        <section class="glass rounded-2xl p-5 mb-4 animate-fade-in" style="animation-delay:0.07s">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="step-badge">2</span>
+                <h2 class="text-sm font-semibold text-stone-500 uppercase tracking-widest">อัปโหลดรูปภาพ</h2>
+            </div>
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('imageInput').click()">
                 <input type="file" id="imageInput" multiple accept="image/*" class="hidden"
                     onchange="handleFiles(this.files)">
-                <div class="flex flex-col items-center">
-                    <div class="w-16 h-16 bg-white/80 rounded-full flex items-center justify-center shadow-sm mb-4">
-                        <svg class="w-8 h-8 text-stone-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
-                            </path>
+                <div class="flex flex-col items-center gap-3 pointer-events-none">
+                    <div
+                        class="w-14 h-14 rounded-full bg-green-100/60 border border-green-200/60 flex items-center justify-center">
+                        <svg class="w-7 h-7 text-green-600/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                     </div>
-                    <p class="text-base font-medium text-stone-800">คลิกเพื่อเลือกรูปภาพ หรือลากวางไฟล์ที่นี่</p>
-                    <p class="text-xs text-stone-500 mt-1">คุณสามารถแก้ไขจุดที่คิดว่าผิดพลาดได้จากแถบสีในรูปนั้น ๆ ได้
-                    </p>
+                    <div>
+                        <p class="text-sm font-semibold text-stone-600">คลิกเพื่อเลือกรูปภาพ หรือลากไฟล์มาวางที่นี่</p>
+                        <p class="text-xs text-stone-400 mt-1 text-center">รองรับ JPG, PNG, WEBP ·
+                            อัปโหลดได้หลายรูปพร้อมกัน</p>
+                    </div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- Results Section -->
-        <div id="resultsContainer" class="hidden">
-            <div class="flex justify-between items-center mb-5 px-2">
-                <h2 class="text-xl font-bold text-stone-800 drop-shadow-sm">ผลการวิเคราะห์</h2>
-                <button onclick="exportToExcel()"
-                    class="hover:scale-105 transition-transform focus:outline-none bg-white/70 backdrop-blur-sm px-4 py-2 rounded-xl shadow-sm border border-white/80 flex items-center gap-2">
-                    <span class="font-semibold text-stone-700 text-sm">ดาวน์โหลด Excel</span>
-                    <img src="Download.svg" class="h-6 w-auto grayscale opacity-80">
+        <!-- ══ STEP 3 · RESULTS ══ -->
+        <div id="resultsContainer" class="hidden animate-fade-in">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 px-1">
+                <div class="flex items-center gap-2">
+                    <span class="step-badge">3</span>
+                    <h2 class="text-sm font-semibold text-stone-500 uppercase tracking-widest">ผลการวิเคราะห์</h2>
+                    <span id="resultCountBadge" class="chip"></span>
+                </div>
+                <button onclick="exportToExcel()" class="btn-secondary self-start sm:self-auto">
+                    <svg class="w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export Excel
                 </button>
             </div>
 
-            <!-- Table Preview -->
-            <div
-                class="bg-white/60 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 overflow-hidden mb-8">
+            <!-- Summary Table -->
+            <div class="glass rounded-2xl overflow-hidden mb-5">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse" id="outputTable">
                         <thead>
-                            <tr class="bg-stone-800/5 text-stone-800 text-sm border-b border-white/40">
-                                <th class="p-3 font-semibold">ลำดับที่ (A)</th>
-                                <th class="p-3 font-semibold">ชื่อพืช (B)</th>
-                                <th class="p-3 font-semibold">ทรีทเมนต์ที่ (C)</th>
-                                <th class="p-3 font-semibold">ขนาดพื้นที่ใบ (D)</th>
+                            <tr class="border-b border-green-900/10">
+                                <th class="p-3 font-semibold">#</th>
+                                <th class="p-3 font-semibold">ชื่อพืช</th>
+                                <th class="p-3 font-semibold">ทรีทเมนต์</th>
+                                <th class="p-3 font-semibold">พื้นที่ใบ (cm²)</th>
                             </tr>
                         </thead>
-                        <tbody id="tableBody" class="divide-y divide-slate-100 text-sm">
-                            <!-- Rows generated by JS -->
+                        <tbody id="tableBody" class="text-sm text-stone-700">
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Visual Cards Grid -->
-            <h3 class="text-md font-semibold text-stone-700 mb-3">ตรวจสอบความถูกต้องของแต่ละรูปภาพ</h3>
+            <!-- Image Cards -->
+            <div class="natural-divider mb-5"></div>
+            <p class="text-xs font-semibold text-stone-400 uppercase tracking-widest mb-3">ตรวจสอบผลรายภาพ</p>
             <div id="cardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <!-- Cards generated by JS -->
             </div>
         </div>
 
     </main>
 
-    <!-- Footer / Copyright -->
-    <footer class="mt-8 mb-6 text-center">
-        <p class="text-sm font-medium text-stone-500">© 2026 ระบบวิเคราะห์พื้นที่ใบไม้. All rights reserved.</p>
-        <p class="text-xs text-stone-400 mt-1">Developer : Saharat Chiasiriphan</p>
+    <!-- ══ FOOTER ══ -->
+    <footer class="py-8 text-center">
+        <div class="natural-divider mb-6"></div>
+        <p class="text-xs text-stone-400">© 2026 ระบบวิเคราะห์พื้นที่ใบไม้. All rights reserved.</p>
+        <p class="text-xs text-stone-300 mt-0.5">Developer : Saharat Chiasiriphan</p>
     </footer>
 
-    <!-- Crop Modal -->
-    <div id="cropModal" class="fixed inset-0 bg-slate-900/80 z-50 hidden flex flex-col items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl flex flex-col overflow-hidden max-h-[90vh]">
-            <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                <h3 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <!-- Modals: Crop, Confirm Reset, Overwrite -->
+    <div id="cropModal" class="modal-backdrop hidden">
+        <div class="glass w-full max-w-4xl flex flex-col overflow-hidden rounded-2xl max-h-[92vh] shadow-2xl">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-white/8">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z">
-                        </path>
+                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                     </svg>
-                    ตัดส่วนที่ไม่ต้องการออก จำเป็นต้องเห็นกรอบแดงและใบไม้ที่ต้องการหาค่า
-                </h3>
-                <button onclick="closeCropModal()"
-                    class="text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none">&times;</button>
+                    <h3 class="text-sm font-semibold text-emerald-100">ครอปรูปภาพ</h3>
+                </div>
+                <p class="text-xs text-emerald-700 hidden sm:block">ต้องให้เห็นกรอบสีแดงและใบไม้ที่ต้องการวัด</p>
+                <button onclick="closeCropModal()" class="btn-ghost !px-2 !py-2 !rounded-lg">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
-            <div class="p-6 flex-1 bg-slate-900 overflow-hidden flex items-center justify-center min-h-[50vh]">
+            <div class="flex-1 overflow-hidden bg-black/60 flex items-center justify-center min-h-[55vh]">
                 <img id="cropImageTarget" src="" class="max-w-full max-h-full block">
             </div>
-            <div class="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
-                <button onclick="closeCropModal()"
-                    class="px-5 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition">ยกเลิก</button>
-                <button onclick="saveCrop()"
-                    class="px-5 py-2 bg-emerald-600 text-white font-medium hover:bg-emerald-700 rounded-lg transition shadow-sm">บันทึกรูปนี้</button>
+            <div class="flex items-center justify-between px-5 py-4 border-t border-white/8">
+                <p class="text-xs text-emerald-700 hidden sm:block">ลากเพื่อปรับพื้นที่ · เลื่อนล้อเมาส์เพื่อซูม</p>
+                <div class="flex gap-2 ml-auto">
+                    <button onclick="closeCropModal()" class="btn-secondary">ยกเลิก</button>
+                    <button onclick="saveCrop()" class="btn-primary">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        บันทึกการครอป
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- JavaScript สำหรับประมวลผลภาพและจัดการตาราง -->
-    <script>
-        let imageRecords = [];
+    <div id="confirmModal" class="modal-backdrop hidden">
+        <div class="glass w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in">
+            <div class="flex items-center gap-3 mb-3">
+                <div
+                    class="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-emerald-50">เริ่มต้นใหม่?</h3>
+                    <p class="text-xs text-emerald-700 mt-0.5">ข้อมูลและรูปภาพทั้งหมดที่วิเคราะห์ไว้จะหายหมด</p>
+                </div>
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button onclick="closeConfirmModal()" class="btn-secondary flex-1 justify-center">ยกเลิก</button>
+                <button onclick="doReset()"
+                    class="btn-primary flex-1 justify-center !bg-red-700 !border-red-500/30 hover:!bg-red-600">ยืนยัน
+                    เริ่มใหม่</button>
+            </div>
+        </div>
+    </div>
 
-        // ป้องกันผู้ใช้เผลอกดรีเฟรชหรือปิดแท็บ (ถ้ามีรูปอัปโหลดไว้แล้ว)
+    <div id="overwriteModal" class="modal-backdrop hidden">
+        <div class="glass w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in">
+            <div class="flex items-center gap-3 mb-3">
+                <div
+                    class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-emerald-50">อัปโหลดชุดใหม่?</h3>
+                    <p class="text-xs text-emerald-700 mt-0.5">การวิเคราะห์ชุดปัจจุบันจะถูกแทนที่ด้วยรูปชุดใหม่</p>
+                </div>
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button onclick="closeOverwriteModal()" class="btn-secondary flex-1 justify-center">ยกเลิก</button>
+                <button onclick="doOverwrite()" class="btn-primary flex-1 justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    อัปโหลดชุดใหม่
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         OVERLAY · LOADING
+    ══════════════════════════════════ -->
+    <div id="loadingOverlay"
+        class="fixed inset-0 z-50 bg-stone-950/60 flex flex-col items-center justify-center gap-4 hidden">
+        <div class="spinner"></div>
+        <div class="text-center">
+            <p class="text-white font-semibold text-sm">กำลังประมวลผล...</p>
+            <p id="loadingStatus" class="text-stone-300 text-xs mt-1">กรุณารอสักครู่</p>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         JAVASCRIPT
+    ══════════════════════════════════ -->
+    <script>
+        // ─── State ─────────────────────────────────────────────
+        let imageRecords = [];
+        let pendingFiles = null; // เก็บ FileList ชั่วคราวรอยืนยัน overwrite
+
+        // ─── Prevent accidental close ──────────────────────────
         window.addEventListener('beforeunload', function (e) {
             if (imageRecords.length > 0) {
                 e.preventDefault();
-                e.returnValue = ''; // บราวเซอร์จะแสดงกล่องเตือนมาตรฐาน (Leave site? Changes you made may not be saved)
+                e.returnValue = '';
             }
         });
 
-        // อัปเดตข้อมูลเมื่อมีการแก้ไขชื่อพืชหรือทรีทเมนต์หลังจากอัปโหลดรูปไปแล้ว
+        // ─── Drag & Drop on upload zone ────────────────────────
+        const uploadZone = document.getElementById('uploadZone');
+        uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+        uploadZone.addEventListener('drop', e => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) triggerUpload(files);
+        });
+
+        // ─── Input Validation ──────────────────────────────────
+        function validateRefArea(input) {
+            const v = parseFloat(input.value);
+            const errEl = document.getElementById('refAreaError');
+            if (!v || v <= 0) {
+                input.classList.add('error');
+                errEl.classList.remove('hidden');
+            } else {
+                input.classList.remove('error');
+                errEl.classList.add('hidden');
+            }
+        }
+
+        // ─── Upload flow ───────────────────────────────────────
+        function triggerUpload(files) {
+            // แปลง FileList เป็น Array ทันที เพื่อป้องกันการสูญหายหลัง reset input
+            const filesArray = Array.from(files);
+            // reset input ให้เลือกไฟล์เดิมซ้ำได้
+            document.getElementById('imageInput').value = '';
+
+            if (imageRecords.length > 0) {
+                pendingFiles = filesArray;
+                document.getElementById('overwriteModal').classList.remove('hidden');
+            } else {
+                doProcessFiles(filesArray);
+            }
+        }
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            triggerUpload(files);
+        }
+
+        function closeOverwriteModal() {
+            pendingFiles = null;
+            document.getElementById('overwriteModal').classList.add('hidden');
+        }
+
+        function doOverwrite() {
+            document.getElementById('overwriteModal').classList.add('hidden');
+            if (pendingFiles) {
+                doProcessFiles(pendingFiles);
+                pendingFiles = null;
+            }
+        }
+
+        // ─── Reset ─────────────────────────────────────────────
+        function confirmReset() {
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+        }
+        function doReset() {
+            closeConfirmModal();
+            imageRecords = [];
+            document.getElementById('tableBody').innerHTML = '';
+            document.getElementById('cardsGrid').innerHTML = '';
+            document.getElementById('resultsContainer').classList.add('hidden');
+            document.getElementById('resetBtn').classList.add('hidden');
+            document.getElementById('plantName').value = '';
+            document.getElementById('treatmentName').value = '';
+            document.getElementById('refArea').value = '4';
+        }
+
+        // ─── Metadata Sync ─────────────────────────────────────
         function updateMetadata() {
             if (imageRecords.length === 0) return;
-
             const newPlantName = document.getElementById('plantName').value.trim() || 'ไม่ระบุชื่อพืช';
             const newTreatmentName = document.getElementById('treatmentName').value.trim() || 'T1';
 
             imageRecords.forEach((record, i) => {
-                const seq = record.seq;
-                const formattedTreatment = `${newTreatmentName}-${String(seq).padStart(2, '0')}`;
-
-                // อัปเดตข้อมูลในอาร์เรย์
+                const formattedTreatment = `${newTreatmentName}-${String(record.seq).padStart(2, '0')}`;
                 record.plantName = newPlantName;
                 record.treatment = formattedTreatment;
 
-                // อัปเดตตาราง
-                const tablePlantElement = document.getElementById(`table-plant-${i}`);
-                if (tablePlantElement) tablePlantElement.innerText = newPlantName;
+                const tp = document.getElementById(`table-plant-${i}`);
+                if (tp) tp.innerText = newPlantName;
 
-                const tableTreatmentElement = document.getElementById(`table-treatment-${i}`);
-                if (tableTreatmentElement) tableTreatmentElement.innerText = formattedTreatment;
+                // ใช้ innerHTML เพื่อรักษา chip styling ของ treatment
+                const tt = document.getElementById(`table-treatment-${i}`);
+                if (tt) tt.innerHTML = `<span class="chip">${formattedTreatment}</span>`;
 
-                // อัปเดตการ์ด
-                const cardTreatmentElement = document.getElementById(`card-treatment-${i}`);
-                if (cardTreatmentElement) cardTreatmentElement.innerText = formattedTreatment;
+                const ct = document.getElementById(`card-treatment-${i}`);
+                if (ct) ct.innerText = formattedTreatment;
+
+                const cp = document.getElementById(`card-plantname-${i}`);
+                if (cp) cp.innerText = newPlantName;
             });
         }
 
-        async function handleFiles(files) {
-            if (files.length === 0) return;
+        // ─── Individual Card Edit ──────────────────────────────
+        function updateCardRecord(i, field, value) {
+            const record = imageRecords[i];
+            if (!record) return;
+            const cleanVal = value.trim();
+
+            if (field === 'plantName') {
+                record.plantName = cleanVal || 'ไม่ระบุชื่อพืช';
+                const tp = document.getElementById(`table-plant-${i}`);
+                if (tp) tp.innerText = record.plantName;
+                const cp = document.getElementById(`card-plantname-${i}`);
+                if (cp && cp.innerText !== record.plantName) cp.innerText = record.plantName;
+            } else if (field === 'treatment') {
+                record.treatment = cleanVal || 'T1';
+                const tt = document.getElementById(`table-treatment-${i}`);
+                if (tt) tt.innerHTML = `<span class="chip">${record.treatment}</span>`;
+                const ct = document.getElementById(`card-treatment-${i}`);
+                if (ct && ct.innerText !== record.treatment) ct.innerText = record.treatment;
+            }
+        }
+
+        // ─── Core: Process Files ───────────────────────────────
+        async function doProcessFiles(files) {
+            // validate refArea
+            const refAreaVal = parseFloat(document.getElementById('refArea').value);
+            if (!refAreaVal || refAreaVal <= 0) {
+                document.getElementById('refArea').classList.add('error');
+                document.getElementById('refAreaError').classList.remove('hidden');
+                document.getElementById('refArea').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
 
             const plantName = document.getElementById('plantName').value.trim() || 'ไม่ระบุชื่อพืช';
             const treatmentName = document.getElementById('treatmentName').value.trim() || 'T1';
-            const refAreaCm2 = parseFloat(document.getElementById('refArea').value) || 4;
+            const refAreaCm2 = refAreaVal;
 
+            // Show loading
+            const loading = document.getElementById('loadingOverlay');
+            const loadingStatus = document.getElementById('loadingStatus');
+            loading.classList.remove('hidden');
+
+            // Reset state
             imageRecords = [];
+            document.getElementById('tableBody').innerHTML = '';
+            document.getElementById('cardsGrid').innerHTML = '';
+            document.getElementById('resultsContainer').classList.add('hidden');
+
+            // Small delay to let browser paint the loading UI
+            await new Promise(r => setTimeout(r, 50));
+
             const tableBody = document.getElementById('tableBody');
             const cardsGrid = document.getElementById('cardsGrid');
-            tableBody.innerHTML = '';
-            cardsGrid.innerHTML = '';
-            document.getElementById('resultsContainer').classList.remove('hidden');
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 const seq = i + 1;
                 const formattedTreatment = `${treatmentName}-${String(seq).padStart(2, '0')}`;
+                loadingStatus.innerText = `กำลังประมวลผลรูปที่ ${seq} จาก ${files.length}...`;
 
                 const img = await loadImage(file);
 
@@ -238,100 +806,130 @@
                     fileName: file.name,
                     originalImg: img,
                     croppedImg: img,
-                    seq: seq,
-                    plantName: plantName,
-                    treatment: formattedTreatment,
-                    refAreaCm2: refAreaCm2,
-                    hueSens: 50,
-                    shadowSens: 50,
-                    redSens: 50,
-                    areaCm2: 0,
-                    highlightedDataUrl: ''
+                    seq, plantName, treatment: formattedTreatment,
+                    refAreaCm2,
+                    hueSens: 50, shadowSens: 50, redSens: 50,
+                    areaCm2: 0, highlightedDataUrl: '',
+                    debounceTimer: null
                 };
 
-                imageRecords.push(record);
-
-                // ประมวลผลครั้งแรก (hueSens=50, shadowSens=50, redSens=50)
                 const { areaCm2, highlightedDataUrl } = processLeafImage(img, refAreaCm2, 50, 50, 50);
                 record.areaCm2 = areaCm2;
                 record.highlightedDataUrl = highlightedDataUrl;
+                imageRecords.push(record);
 
-                // --- สร้าง Table Row ---
+                // ── Table Row ──
                 const row = document.createElement('tr');
-                row.className = "hover:bg-white/40 transition-colors";
+                row.className = 'hover:bg-green-50/50 transition-colors';
                 row.innerHTML = `
-                    <td class="p-3 font-medium text-stone-600">${seq}</td>
-                    <td class="p-3 text-stone-800" id="table-plant-${i}">${plantName}</td>
-                    <td class="p-3 text-stone-700 font-medium" id="table-treatment-${i}">${formattedTreatment}</td>
-                    <td class="p-3 font-bold text-stone-900" id="table-area-${i}">${areaCm2.toFixed(2)} cm²</td>
+                    <td class="p-3 text-stone-400 font-medium">${seq}</td>
+                    <td class="p-3 text-stone-700" id="table-plant-${i}">${plantName}</td>
+                    <td class="p-3" id="table-treatment-${i}"><span class="chip">${formattedTreatment}</span></td>
+                    <td class="p-3 font-bold text-stone-800" id="table-area-${i}">${areaCm2.toFixed(2)} cm²</td>
                 `;
                 tableBody.appendChild(row);
 
-                // --- สร้าง Card ---
+                // ── Image Card ──
                 const card = document.createElement('div');
-                card.className = "bg-white/60 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 p-5 flex flex-col justify-between hover:shadow-xl transition-all duration-300 relative overflow-hidden group";
+                card.className = 'glass rounded-2xl p-4 flex flex-col gap-3 hover:shadow-lg transition-all duration-300';
                 card.innerHTML = `
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-stone-300/30 rounded-full blur-3xl -z-10 group-hover:bg-stone-300/50 transition-all"></div>
-                    <div>
-                        <div class="flex justify-between items-start mb-3 gap-2">
-                            <div class="flex items-center gap-2 overflow-hidden">
-                                <span class="text-xs font-bold bg-stone-800/10 text-stone-800 px-2.5 py-1 rounded-lg shrink-0 border border-stone-800/10">#${seq}</span>
-                                <span class="text-xs text-stone-600 truncate" title="${file.name}">${file.name}</span>
-                            </div>
-                            <div class="flex gap-1.5 shrink-0">
-                                <button onclick="openCropModal(${i})" class="text-[11px] flex items-center gap-1 bg-white/80 hover:bg-white text-stone-700 px-2.5 py-1.5 rounded-lg transition border border-white shadow-sm font-medium">
-                                    <svg class="w-3.5 h-3.5 text-stone-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z"></path></svg>
-                                    ครอป
-                                </button>
-                                <button onclick="downloadImageRecord(${i})" class="text-[11px] flex items-center gap-1 bg-stone-700 hover:bg-stone-800 text-white px-2.5 py-1.5 rounded-lg transition shadow-sm font-medium" title="โหลดภาพนี้พร้อมข้อมูล">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                    บันทึกรูป
-                                </button>
-                            </div>
+                    <!-- Card Header -->
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="chip shrink-0">#${seq}</span>
+                            <span class="text-xs text-stone-400 truncate" title="${file.name}">${file.name}</span>
                         </div>
-                        <div class="bg-white/40 backdrop-blur-md rounded-2xl overflow-hidden flex items-center justify-center h-48 mb-4 border border-white/50 shadow-inner">
-                            <img id="img-preview-${i}" src="${highlightedDataUrl}" class="max-h-full max-w-full object-contain" alt="Highlighted Leaf">
-                        </div>
-                    </div>
-                    
-                    <!-- Sliders ปรับความไว -->
-                    <div class="mb-4 space-y-3 bg-white/40 backdrop-blur-sm p-4 rounded-2xl border border-white/60 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
-                        <div>
-                            <div class="flex justify-between text-[11px] mb-1">
-                                <label class="text-stone-700 font-medium">การกรองจุดรบกวนพื้นหลัง (Hue)</label>
-                                <span id="hue-val-${i}" class="text-stone-500">50%</span>
-                            </div>
-                            <input type="range" class="w-full h-1.5 bg-emerald-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" 
-                                min="0" max="100" value="50" oninput="updateImage(${i}, 'hue', this.value)" title="ปรับลดลงเพื่อตัดเม็ดสีเขียวแปลกปลอมบนพื้นหลัง">
-                        </div>
-                        <div>
-                            <div class="flex justify-between text-xs mb-1">
-                                <label class="text-stone-700 font-medium">การรับแสงและเงาดำบนใบ</label>
-                                <span id="shadow-val-${i}" class="text-stone-500">50%</span>
-                            </div>
-                            <input type="range" class="w-full h-1.5 bg-slate-300 rounded-lg appearance-none cursor-pointer accent-slate-600" 
-                                min="0" max="100" value="50" oninput="updateImage(${i}, 'shadow', this.value)" title="ปรับเพิ่มขึ้นเพื่อให้ครอบคลุมส่วนที่เป็นเงาดำบนใบ">
-                        </div>
-                        <div class="pt-2 border-t border-white/50 mt-3">
-                            <div class="flex justify-between text-[11px] mb-1">
-                                <label class="text-stone-800 font-semibold">ความแม่นยำกล่องสีแดง</label>
-                                <span id="red-val-${i}" class="text-stone-600">50%</span>
-                            </div>
-                            <input type="range" class="w-full h-1.5 bg-rose-200/50 rounded-lg appearance-none cursor-pointer accent-rose-700" 
-                                min="0" max="100" value="50" oninput="updateImage(${i}, 'red', this.value)">
+                        <div class="flex gap-1.5 shrink-0">
+                            <button onclick="openCropModal(${i})" class="btn-ghost" title="ตัดขอบรูปภาพ">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 2v14a2 2 0 0 0 2 2h14"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 22V8a2 2 0 0 0-2-2H2"/>
+                                </svg>
+                                ตัดขอบ
+                            </button>
+                            <button onclick="downloadImageRecord(${i})" class="btn-primary !py-1.5 !text-xs" title="ดาวน์โหลดภาพพร้อมข้อมูล">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                บันทึกรูป
+                            </button>
                         </div>
                     </div>
 
-                    <div class="bg-stone-800/5 backdrop-blur-sm p-4 rounded-2xl flex justify-between items-center mt-auto border border-stone-800/10">
-                        <span id="card-treatment-${i}" class="text-xs text-stone-800 font-bold tracking-wide">${formattedTreatment}</span>
-                        <span class="text-2xl font-black text-stone-800 drop-shadow-sm"><span id="card-area-${i}">${areaCm2.toFixed(2)}</span> <span class="text-xs font-semibold text-stone-600">cm²</span></span>
+                    <!-- Preview Image -->
+                    <div class="rounded-xl overflow-hidden bg-stone-900/5 h-44 flex items-center justify-center border border-stone-200/50">
+                        <img id="img-preview-${i}" src="${highlightedDataUrl}" class="max-h-full max-w-full object-contain">
+                    </div>
+
+                    <!-- Info Bar: ชื่อ + Treatment + พื้นที่ใบ -->
+                    <div class="flex items-center justify-between gap-2 bg-stone-50/80 border border-stone-200/60 rounded-xl px-3 py-2.5">
+                        <div class="min-w-0 flex-1 space-y-1">
+                            <div class="flex items-center gap-1.5 group cursor-text" onclick="document.getElementById('card-plantname-${i}').focus()">
+                                <p id="card-plantname-${i}" contenteditable="true" 
+                                   class="text-xs font-semibold text-stone-600 truncate outline-none focus:bg-white focus:ring-1 focus:ring-stone-300 rounded px-1 -ml-1 transition-all" 
+                                   onblur="updateCardRecord(${i}, 'plantName', this.innerText)"
+                                   title="คลิกเพื่อแก้ไขชื่อพืช">${plantName || 'ไม่ระบุชื่อพืช'}</p>
+                                <svg class="w-3 h-3 text-stone-300 group-hover:text-stone-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                            </div>
+                            <div class="flex items-center gap-1.5 group cursor-text" onclick="document.getElementById('card-treatment-${i}').focus()">
+                                <span id="card-treatment-${i}" contenteditable="true" 
+                                   class="chip outline-none focus:bg-white focus:ring-1 focus:ring-stone-300 transition-all" 
+                                   onblur="updateCardRecord(${i}, 'treatment', this.innerText)"
+                                   title="คลิกเพื่อแก้ไขทรีทเมนต์">${formattedTreatment}</span>
+                                <svg class="w-3 h-3 text-stone-300 group-hover:text-stone-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <p class="text-[10px] text-stone-400 font-medium leading-none mb-0.5">พื้นที่ใบ</p>
+                            <p class="leading-none">
+                                <span class="text-xl font-extrabold text-stone-800" id="card-area-${i}">${areaCm2.toFixed(2)}</span>
+                                <span class="text-xs text-stone-400 font-medium ml-0.5">cm²</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Sliders -->
+                    <div class="space-y-3 bg-stone-50/60 rounded-xl p-3 border border-stone-200/50">
+                        <div class="has-tooltip">
+                            <div class="flex justify-between text-[11px] mb-1.5">
+                                <label class="text-stone-500 font-medium">กรองพื้นหลัง (Hue)</label>
+                                <span id="hue-val-${i}" class="text-stone-600 font-semibold">50%</span>
+                            </div>
+                            <input type="range" class="hue-slider" min="0" max="100" value="50"
+                                oninput="updateImage(${i}, 'hue', this.value)">
+                            <span class="tooltip-text">ปรับลดลงเพื่อตัดจุดสีเขียวที่ปะปนในพื้นหลัง</span>
+                        </div>
+                        <div class="has-tooltip">
+                            <div class="flex justify-between text-[11px] mb-1.5">
+                                <label class="text-stone-500 font-medium">รับแสง/เงาดำ (Shadow)</label>
+                                <span id="shadow-val-${i}" class="text-stone-600 font-semibold">50%</span>
+                            </div>
+                            <input type="range" class="shadow-slider" min="0" max="100" value="50"
+                                oninput="updateImage(${i}, 'shadow', this.value)">
+                            <span class="tooltip-text">ปรับเพิ่มขึ้นเพื่อให้ครอบคลุมบริเวณที่มีเงาตกทับบนใบ</span>
+                        </div>
+                        <div class="has-tooltip pt-2 border-t border-stone-200/60">
+                            <div class="flex justify-between text-[11px] mb-1.5">
+                                <label class="text-stone-600 font-semibold">ความแม่นยำกล่องสีแดง</label>
+                                <span id="red-val-${i}" class="text-stone-600 font-semibold">50%</span>
+                            </div>
+                            <input type="range" class="red-slider" min="0" max="100" value="50"
+                                oninput="updateImage(${i}, 'red', this.value)">
+                            <span class="tooltip-text">ปรับหากกล่องสีแดงอ้างอิงถูกจับสีผิดพลาด (เช่น สีแดงอมส้ม)</span>
+                        </div>
                     </div>
                 `;
                 cardsGrid.appendChild(card);
             }
+
+            // Show results
+            document.getElementById('resultsContainer').classList.remove('hidden');
+            document.getElementById('resultCountBadge').innerText = `${files.length} รูป`;
+            document.getElementById('resetBtn').classList.remove('hidden');
+            loading.classList.add('hidden');
+
+            // Scroll to results
+            document.getElementById('resultsContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
-        // ฟังก์ชันสำหรับดาวน์โหลดภาพพร้อมฝังข้อมูล (Layout ตามที่ออกแบบไว้)
+        // ─── Download Image with Info Footer ──────────────────
         function downloadImageRecord(index) {
             const record = imageRecords[index];
             if (!record) return;
@@ -340,8 +938,6 @@
             img.onload = function () {
                 const W = img.width;
                 const H_img = img.height;
-
-                // คำนวณความสูงของส่วนข้อมูลด้านล่าง (ประมาณ 30% ของความกว้างภาพ หรืออย่างน้อย 300px)
                 const H_footer = Math.max(300, Math.floor(W * 0.3));
                 const H = H_img + H_footer;
 
@@ -350,92 +946,79 @@
                 canvas.height = H;
                 const ctx = canvas.getContext('2d');
 
-                // 1. เทสีพื้นหลังเป็นสีขาว
-                ctx.fillStyle = "#ffffff";
+                // Background
+                ctx.fillStyle = '#fafaf9';
                 ctx.fillRect(0, 0, W, H);
 
-                // 2. วาดภาพที่ไฮไลต์แล้ว ด้านบน
+                // Image
                 ctx.drawImage(img, 0, 0);
 
-                // 3. วาดเส้นขอบและกรอบตาราง
-                ctx.strokeStyle = "#333333";
+                // Borders
+                ctx.strokeStyle = '#44403c';
                 ctx.lineWidth = Math.max(2, Math.floor(W * 0.003));
 
-                // กรอบรอบนอกสุด
                 ctx.strokeRect(0, 0, W, H);
 
-                // เส้นนอนกั้นภาพกับข้อมูล
                 ctx.beginPath();
                 ctx.moveTo(0, H_img);
                 ctx.lineTo(W, H_img);
                 ctx.stroke();
 
-                // คำนวณความสูงของแต่ละแถวใน Footer
-                const bottomRowH = Math.floor(H_footer * 0.15); // แถววันที่
-                const dataH = H_footer - bottomRowH; // แถวข้อมูล
+                const bottomRowH = Math.floor(H_footer * 0.15);
+                const dataH = H_footer - bottomRowH;
 
-                // เส้นนอนกั้นวันที่ด้านล่าง
                 ctx.beginPath();
                 ctx.moveTo(0, H_img + dataH);
                 ctx.lineTo(W, H_img + dataH);
                 ctx.stroke();
 
-                // เส้นแนวตั้งตรงกลาง (เว้นระยะบนล่างนิดหน่อย)
                 ctx.beginPath();
                 ctx.moveTo(W / 2, H_img + (dataH * 0.15));
                 ctx.lineTo(W / 2, H_img + (dataH * 0.85));
                 ctx.stroke();
 
-                // 4. เขียนข้อความ
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
+                // Text
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
 
-                const labelSize = Math.floor(dataH * 0.12);
-                const valSize = Math.floor(dataH * 0.20);
-                const areaSize = Math.floor(dataH * 0.32);
+                const labelSz = Math.floor(dataH * 0.12);
+                const valSz = Math.floor(dataH * 0.20);
+                const areaSz = Math.floor(dataH * 0.32);
 
-                // คอลัมน์ซ้าย (ชื่อการทดลอง)
-                const leftCenter = W * 0.25;
-                ctx.fillStyle = "#555555";
-                ctx.font = `bold ${labelSize}px 'Sarabun', sans-serif`;
-                ctx.fillText("การทดลอง", leftCenter, H_img + (dataH * 0.25));
+                // Left col
+                const lc = W * 0.25;
+                ctx.fillStyle = '#a8a29e';
+                ctx.font = `500 ${labelSz}px 'Prompt', sans-serif`;
+                ctx.fillText('การทดลอง', lc, H_img + (dataH * 0.25));
+                ctx.fillStyle = '#292524';
+                ctx.font = `700 ${valSz}px 'Prompt', sans-serif`;
+                ctx.fillText(record.plantName, lc, H_img + (dataH * 0.55));
+                ctx.fillText(record.treatment, lc, H_img + (dataH * 0.82));
 
-                ctx.fillStyle = "#222222";
-                ctx.font = `bold ${valSize}px 'Sarabun', sans-serif`;
-                ctx.fillText(record.plantName, leftCenter, H_img + (dataH * 0.55));
-                ctx.fillText(record.treatment, leftCenter, H_img + (dataH * 0.82));
+                // Right col
+                const rc = W * 0.75;
+                ctx.fillStyle = '#a8a29e';
+                ctx.font = `500 ${labelSz}px 'Prompt', sans-serif`;
+                ctx.fillText('ขนาดพื้นที่ใบ', rc, H_img + (dataH * 0.25));
+                ctx.fillStyle = '#292524';
+                ctx.font = `800 ${areaSz}px 'Prompt', sans-serif`;
+                ctx.fillText(record.areaCm2.toFixed(2), rc, H_img + (dataH * 0.55));
+                ctx.font = `600 ${valSz}px 'Prompt', sans-serif`;
+                ctx.fillText('cm²', rc, H_img + (dataH * 0.82));
 
-                // คอลัมน์ขวา (ขนาดพื้นที่ใบ)
-                const rightCenter = W * 0.75;
-                ctx.fillStyle = "#555555";
-                ctx.font = `bold ${labelSize}px 'Sarabun', sans-serif`;
-                ctx.fillText("ขนาดพื้นที่ใบ", rightCenter, H_img + (dataH * 0.25));
-
-                ctx.fillStyle = "#222222";
-                ctx.font = `bold ${areaSize}px 'Sarabun', sans-serif`;
-                ctx.fillText(record.areaCm2.toFixed(2), rightCenter, H_img + (dataH * 0.55));
-
-                ctx.font = `bold ${valSize}px 'Sarabun', sans-serif`;
-                ctx.fillText("cm²", rightCenter, H_img + (dataH * 0.82));
-
-                // แถววันที่ด้านล่างสุด
+                // Date row
                 const now = new Date();
-                const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
-                const timestampStr = `บันทึกเมื่อ : ${dateStr}`;
+                const d = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
+                ctx.fillStyle = '#78716c';
+                ctx.font = `500 ${Math.floor(bottomRowH * 0.52)}px 'Prompt', sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillText(`บันทึกเมื่อ : ${d}`, W / 2, H_img + dataH + (bottomRowH / 2));
 
-                ctx.fillStyle = "#555555";
-                ctx.font = `bold ${Math.floor(bottomRowH * 0.55)}px 'Sarabun', sans-serif`;
-                ctx.textAlign = "center";
-                ctx.fillText(timestampStr, W / 2, H_img + dataH + (bottomRowH / 2));
+                ctx.textAlign = 'right';
+                ctx.font = `400 ${Math.floor(bottomRowH * 0.38)}px 'Prompt', sans-serif`;
+                ctx.fillStyle = '#c4bdb8';
+                ctx.fillText('Dev : Saharat', W - (W * 0.02), H_img + dataH + (bottomRowH / 2));
 
-                // เครดิตด้านขวาล่าง
-                const creditStr = "Dev : Saharat";
-                ctx.textAlign = "right";
-                ctx.font = `${Math.floor(bottomRowH * 0.40)}px 'Sarabun', sans-serif`;
-                ctx.fillStyle = "#999999";
-                ctx.fillText(creditStr, W - (W * 0.02), H_img + dataH + (bottomRowH / 2));
-
-                // 5. บันทึกและดาวน์โหลด
                 const link = document.createElement('a');
                 link.download = `${record.plantName}_${record.treatment}.jpg`;
                 link.href = canvas.toDataURL('image/jpeg', 0.95);
@@ -444,36 +1027,31 @@
             img.src = record.highlightedDataUrl;
         }
 
-        // ฟังก์ชันประมวลผลซ้ำเมื่อเลื่อน Slider
+        // ─── Slider Update w/ Debounce ─────────────────────────
         function updateImage(id, type, value) {
             const record = imageRecords[id];
             const numVal = parseInt(value);
-            if (type === 'hue') {
-                record.hueSens = numVal;
-                document.getElementById('hue-val-' + id).innerText = numVal + '%';
-            } else if (type === 'shadow') {
-                record.shadowSens = numVal;
-                document.getElementById('shadow-val-' + id).innerText = numVal + '%';
-            } else if (type === 'red') {
-                record.redSens = numVal;
-                document.getElementById('red-val-' + id).innerText = numVal + '%';
-            }
 
-            // คำนวณใหม่โดยใช้รูปที่ Crop ไว้ (เร็วมาก)
-            const { areaCm2, highlightedDataUrl } = processLeafImage(record.croppedImg, record.refAreaCm2, record.hueSens, record.shadowSens, record.redSens);
-            record.areaCm2 = areaCm2;
-            record.highlightedDataUrl = highlightedDataUrl;
+            if (type === 'hue') { record.hueSens = numVal; document.getElementById('hue-val-' + id).innerText = numVal + '%'; }
+            else if (type === 'shadow') { record.shadowSens = numVal; document.getElementById('shadow-val-' + id).innerText = numVal + '%'; }
+            else if (type === 'red') { record.redSens = numVal; document.getElementById('red-val-' + id).innerText = numVal + '%'; }
 
-            // อัปเดต UI กลับไปทันที
-            document.getElementById('img-preview-' + id).src = highlightedDataUrl;
-            document.getElementById('card-area-' + id).innerText = areaCm2.toFixed(2);
-            document.getElementById('table-area-' + id).innerText = areaCm2.toFixed(2) + ' cm²';
+            clearTimeout(record.debounceTimer);
+            record.debounceTimer = setTimeout(() => {
+                const { areaCm2, highlightedDataUrl } = processLeafImage(record.croppedImg, record.refAreaCm2, record.hueSens, record.shadowSens, record.redSens);
+                record.areaCm2 = areaCm2;
+                record.highlightedDataUrl = highlightedDataUrl;
+                document.getElementById('img-preview-' + id).src = highlightedDataUrl;
+                document.getElementById('card-area-' + id).innerText = areaCm2.toFixed(2);
+                document.getElementById('table-area-' + id).innerText = areaCm2.toFixed(2) + ' cm²';
+            }, 150);
         }
 
+        // ─── Load Image helper ─────────────────────────────────
         function loadImage(file) {
-            return new Promise((resolve) => {
+            return new Promise(resolve => {
                 const reader = new FileReader();
-                reader.onload = (e) => {
+                reader.onload = e => {
                     const img = new Image();
                     img.onload = () => resolve(img);
                     img.src = e.target.result;
@@ -482,89 +1060,57 @@
             });
         }
 
-        // --- ระบบจัดการ Cropper.js ---
+        // ─── Crop Modal ────────────────────────────────────────
         let currentCropper = null;
         let currentCropRecordId = null;
 
         function openCropModal(id) {
             const record = imageRecords[id];
             currentCropRecordId = id;
-
             const modal = document.getElementById('cropModal');
             const imgTarget = document.getElementById('cropImageTarget');
-
-            // เอารูปต้นฉบับมาแสดงใน Cropper
             imgTarget.src = record.originalImg.src;
             modal.classList.remove('hidden');
-
-            // รอให้รูปโหลดขึ้น UI แปบนึงแล้วเปิด Cropper
             setTimeout(() => {
                 if (currentCropper) currentCropper.destroy();
-                currentCropper = new Cropper(imgTarget, {
-                    viewMode: 1,
-                    autoCropArea: 0.9,
-                    responsive: true,
-                    background: true
-                });
+                currentCropper = new Cropper(imgTarget, { viewMode: 1, autoCropArea: 0.9, responsive: true, background: true });
             }, 50);
         }
 
         function closeCropModal() {
             document.getElementById('cropModal').classList.add('hidden');
-            if (currentCropper) {
-                currentCropper.destroy();
-                currentCropper = null;
-            }
+            if (currentCropper) { currentCropper.destroy(); currentCropper = null; }
         }
 
         function saveCrop() {
             if (!currentCropper || currentCropRecordId === null) return;
-
             const record = imageRecords[currentCropRecordId];
-
-            // ดึงภาพที่ถูกตัดเป็น Canvas (ลดขนาดนิดหน่อยเพื่อไม่ให้หนักเครื่อง)
-            const canvas = currentCropper.getCroppedCanvas({
-                maxWidth: 1200,
-                maxHeight: 1200
-            });
-
-            // แปลงกลับเป็น Image Object เพื่อเก็บไว้ใช้
+            const canvas = currentCropper.getCroppedCanvas({ maxWidth: 1200, maxHeight: 1200 });
             const croppedImage = new Image();
             croppedImage.onload = () => {
-                record.croppedImg = croppedImage; // อัปเดตใน record
-
-                // สั่งคำนวณพื้นที่ใหม่ด้วยภาพที่ Crop แล้ว
+                record.croppedImg = croppedImage;
                 const { areaCm2, highlightedDataUrl } = processLeafImage(record.croppedImg, record.refAreaCm2, record.hueSens, record.shadowSens, record.redSens);
                 record.areaCm2 = areaCm2;
                 record.highlightedDataUrl = highlightedDataUrl;
-
-                // อัปเดต UI กลับไปทันที
                 document.getElementById('img-preview-' + currentCropRecordId).src = highlightedDataUrl;
                 document.getElementById('card-area-' + currentCropRecordId).innerText = areaCm2.toFixed(2);
                 document.getElementById('table-area-' + currentCropRecordId).innerText = areaCm2.toFixed(2) + ' cm²';
-
                 closeCropModal();
             };
             croppedImage.src = canvas.toDataURL('image/jpeg', 0.9);
         }
 
-        // ฟังก์ชันประมวลผลภาพ (Color Thresholding + Hole Filling)
+        // ─── Core: Image Processing ────────────────────────────
         function processLeafImage(img, refAreaCm2, hueSens, shadowSens, redSens) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
 
-            // ย่อขนาดภาพเพื่อความเร็วในการประมวลผลบน Browser (Max width 800px)
             const MAX_WIDTH = 800;
             let width = img.width;
             let height = img.height;
-            if (width > MAX_WIDTH) {
-                height *= MAX_WIDTH / width;
-                width = MAX_WIDTH;
-            }
-            // ปัดเศษกว้างยาวเพื่อหลีกเลี่ยงจุดทศนิยมเวลาทำ Flood Fill
+            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
             width = Math.floor(width);
             height = Math.floor(height);
-
             canvas.width = width;
             canvas.height = height;
             ctx.drawImage(img, 0, 0, width, height);
@@ -573,42 +1119,26 @@
             const data = imgData.data;
             let leafPixelCount = 0;
             let refPixelCount = 0;
-
-            // สร้าง Mask สำหรับแยกแยะพิกเซล: 0=Unknown(Hole), 1=Leaf, 2=Red, 3=Background
             const mask = new Uint8Array(width * height);
 
-            // --- แมปปิ้งค่า Sensitivity จาก 0-100 เป็น Threshold ---
-            // 1. ความกว้างโทนสีเขียว (Hue Range): ถ้าค่าน้อย = จับแค่เขียวแท้ๆ, ถ้าค่ามาก = เผื่อแผ่ไปเหลือง/ฟ้า
-            const hueRange = 20 + (hueSens / 100) * 100; // Range: 20 ถึง 120
+            const hueRange = 20 + (hueSens / 100) * 100;
             const h_min = 100 - hueRange / 2;
             const h_max = 100 + hueRange / 2;
-
-            // 2. ความไวเงามืด (Shadow Sensitivity): ถ้าค่ามาก = ยอมรับสีที่ดำหรือซีดมากๆ ได้
-            const v_leaf_min = 0.30 - (shadowSens / 100) * 0.28; // Range: 0.30 (เข้มงวด) ถึง 0.02 (ยอมรับเงาดำ)
-            const s_leaf_min = 0.30 - (shadowSens / 100) * 0.28; // Range: 0.30 (เข้มงวด) ถึง 0.02 (ยอมรับสีซีด)
-            const exg_min = 30 - (shadowSens / 100) * 25; // สำหรับ fallback กรณีสีเขียวเข้มจัด
-
-            // 3. ความไวกล่องแดง (Red Sensitivity)
+            const v_leaf_min = 0.30 - (shadowSens / 100) * 0.28;
+            const s_leaf_min = 0.30 - (shadowSens / 100) * 0.28;
+            const exg_min = 30 - (shadowSens / 100) * 25;
             const redOffset = (redSens - 50) / 50;
             const s_red_min = Math.max(0.10, 0.40 - redOffset * 0.20);
             const v_red_min = Math.max(0.10, 0.35 - redOffset * 0.20);
             const red_ratio = Math.max(1.1, 1.5 - redOffset * 0.4);
 
-            // --- Pass 1: ตรวจจับสีเบื้องต้น ---
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     const i = y * width + x;
                     const idx = i * 4;
-                    const r = data[idx];
-                    const g = data[idx + 1];
-                    const b = data[idx + 2];
-
+                    const r = data[idx], g = data[idx + 1], b = data[idx + 2];
                     const exG = 2 * g - r - b;
-
-                    const cmax = Math.max(r, g, b);
-                    const cmin = Math.min(r, g, b);
-                    const delta = cmax - cmin;
-
+                    const cmax = Math.max(r, g, b), cmin = Math.min(r, g, b), delta = cmax - cmin;
                     let h = 0;
                     if (delta > 0) {
                         if (cmax === r) h = 60 * (((g - b) / delta) % 6);
@@ -619,90 +1149,47 @@
                     const s = cmax === 0 ? 0 : delta / cmax;
                     const v = cmax / 255;
 
-                    let isLeaf = false;
-                    if (h >= h_min && h <= h_max && s >= s_leaf_min && v >= v_leaf_min) {
-                        isLeaf = true;
-                    } else if (exG > exg_min && g > 25 && g >= r && g >= b) {
-                        isLeaf = true;
-                    }
+                    let isLeaf = (h >= h_min && h <= h_max && s >= s_leaf_min && v >= v_leaf_min) ||
+                        (exG > exg_min && g > 25 && g >= r && g >= b);
+                    let isRedRef = ((h >= 0 && h <= 20) || (h >= 340 && h <= 360)) && s >= s_red_min && v >= v_red_min && r > g * red_ratio && r > b * red_ratio;
 
-                    let isRedRef = false;
-                    if (((h >= 0 && h <= 20) || (h >= 340 && h <= 360)) && s >= s_red_min && v >= v_red_min && r > g * red_ratio && r > b * red_ratio) {
-                        isRedRef = true;
-                    }
-
-                    if (isLeaf) {
-                        mask[i] = 1;
-                    } else if (isRedRef) {
-                        mask[i] = 2;
-                    }
+                    if (isLeaf) mask[i] = 1;
+                    else if (isRedRef) mask[i] = 2;
                 }
             }
 
-            // --- Pass 2: อัลกอริทึมเติมเต็มรูรั่ว (Hole Filling / Flood Fill) เพื่อแก้ปัญหาแสงสะท้อนกลางใบไม้ ---
+            // Flood Fill
             const stack = [];
             function pushIfZero(x, y) {
                 if (x >= 0 && x < width && y >= 0 && y < height) {
                     const i = y * width + x;
-                    if (mask[i] === 0) {
-                        mask[i] = 3; // เทสีเป็น Background
-                        stack.push(i);
-                    }
+                    if (mask[i] === 0) { mask[i] = 3; stack.push(i); }
                 }
             }
-
-            // เริ่มเทสีจากขอบภาพทั้ง 4 ด้าน
-            for (let x = 0; x < width; x++) {
-                pushIfZero(x, 0);
-                pushIfZero(x, height - 1);
-            }
-            for (let y = 0; y < height; y++) {
-                pushIfZero(0, y);
-                pushIfZero(width - 1, y);
-            }
-
-            // ประมวลผล Flood Fill
+            for (let x = 0; x < width; x++) { pushIfZero(x, 0); pushIfZero(x, height - 1); }
+            for (let y = 0; y < height; y++) { pushIfZero(0, y); pushIfZero(width - 1, y); }
             while (stack.length > 0) {
                 const i = stack.pop();
-                const x = i % width;
-                const y = Math.floor(i / width);
-
-                pushIfZero(x + 1, y);
-                pushIfZero(x - 1, y);
-                pushIfZero(x, y + 1);
-                pushIfZero(x, y - 1);
+                const x = i % width, y = Math.floor(i / width);
+                pushIfZero(x + 1, y); pushIfZero(x - 1, y); pushIfZero(x, y + 1); pushIfZero(x, y - 1);
             }
+            for (let i = 0; i < mask.length; i++) { if (mask[i] === 0) mask[i] = 1; }
 
-            // หลังจาก Flood Fill พิกเซลใดที่ยังเป็น 0 ถือว่าเป็น "รู (Hole)" ที่อยู่ข้างในใบไม้ ให้เปลี่ยนเป็นใบไม้
-            for (let i = 0; i < mask.length; i++) {
-                if (mask[i] === 0) {
-                    mask[i] = 1;
-                }
-            }
-
-            // --- Pass 3: ระบายสีไฮไลต์และนับจำนวนพิกเซลสุดท้าย ---
+            // Render highlight
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     const i = y * width + x;
                     const idx = i * 4;
-                    const r = data[idx];
-                    const g = data[idx + 1];
-                    const b = data[idx + 2];
-                    const type = mask[i];
-
-                    if (type === 1) {
+                    const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+                    if (mask[i] === 1) {
                         leafPixelCount++;
-                        // ไฮไลต์ใบไม้เป็นสีเขียว
                         data[idx] = Math.floor(r * 0.4);
                         data[idx + 1] = 255;
                         data[idx + 2] = Math.floor(b * 0.4);
-                    } else if (type === 2) {
+                    } else if (mask[i] === 2) {
                         refPixelCount++;
-                        // ไฮไลต์กล่องสีแดงเป็นสีชมพู
-                        data[idx] = 255;
-                        data[idx + 1] = 0;
-                        data[idx + 2] = 255;
-                    } else { // type === 3 (Background)
+                        data[idx] = 255; data[idx + 1] = 0; data[idx + 2] = 255;
+                    } else {
                         data[idx] = Math.floor(r * 0.8 + 40);
                         data[idx + 1] = Math.floor(g * 0.8 + 40);
                         data[idx + 2] = Math.floor(b * 0.8 + 40);
@@ -712,43 +1199,24 @@
 
             ctx.putImageData(imgData, 0, 0);
             const highlightedDataUrl = canvas.toDataURL();
-
-            // คำนวณพื้นที่เป็น cm² 
-            let areaCm2 = 0;
-            if (refPixelCount > 0) {
-                // (สัดส่วนพิกเซลใบไม้ต่อพิกเซลกล่องอ้างอิง) * ขนาดกล่องอ้างอิงจริง
-                areaCm2 = (leafPixelCount / refPixelCount) * refAreaCm2;
-            } else {
-                // Fallback กรณีหากล่องแดงไม่เจอ
-                areaCm2 = leafPixelCount / 100;
-                console.warn("ไม่พบกล่องอ้างอิงสีแดงในภาพ!");
-            }
-
+            const areaCm2 = refPixelCount > 0 ? (leafPixelCount / refPixelCount) * refAreaCm2 : leafPixelCount / 100;
+            if (refPixelCount === 0) console.warn('ไม่พบกล่องอ้างอิงสีแดงในภาพ!');
             return { areaCm2, highlightedDataUrl };
         }
 
-        // ฟังก์ชัน Export เป็น Excel 
+        // ─── Export Excel ──────────────────────────────────────
         function exportToExcel() {
             if (imageRecords.length === 0) return;
-
-            // ดึงข้อมูลล่าสุดจาก imageRecords
-            const exportData = imageRecords.map(record => ({
-                "ลำดับที่": record.seq,
-                "ชื่อพืช": record.plantName,
-                "ทรีทเมนต์ที่": record.treatment,
-                "ขนาดพื้นที่ใบ (cm²)": parseFloat(record.areaCm2.toFixed(2))
+            const exportData = imageRecords.map(r => ({
+                'ลำดับที่': r.seq,
+                'ชื่อพืช': r.plantName,
+                'ทรีทเมนต์': r.treatment,
+                'ขนาดพื้นที่ใบ (cm²)': parseFloat(r.areaCm2.toFixed(2))
             }));
-
-            const worksheet = XLSX.utils.json_to_sheet(exportData);
-
-            // ปรับแต่งหัวตาราง
-            XLSX.utils.sheet_add_aoa(worksheet, [["ลำดับที่", "ชื่อพืช", "ทรีทเมนต์ที่", "ขนาดพื้นที่ใบ (cm²)"]], { origin: "A1" });
-
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Leaf_Area_Results");
-
-            // บันทึกไฟล์ Excel
-            XLSX.writeFile(workbook, `Leaf_Area_Analysis_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Leaf_Area_Results');
+            XLSX.writeFile(wb, `Leaf_Area_${new Date().toISOString().slice(0, 10)}.xlsx`);
         }
     </script>
 </body>
